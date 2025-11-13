@@ -1,91 +1,8 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { SkeletonLoader } from './SkeletonLoader';
 import { SearchIcon } from './icons';
+import { Popover, PopoverContent } from './Popover';
 
-// --- The new selection popover component ---
-interface SelectionPopoverProps {
-  selection: string;
-  position: { top: number; left: number };
-  transform: string;
-  onExplore: (topic: string) => void;
-  onClose: () => void;
-}
-
-const SelectionPopover: React.FC<SelectionPopoverProps> = ({ selection, position, transform, onExplore, onClose }) => {
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [context, setContext] = useState('');
-
-  // Close when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [onClose]);
-
-  const handleExploreWithContext = () => {
-    if (context.trim()) {
-      onExplore(`${selection}: ${context}`);
-      onClose();
-    }
-  };
-  
-  const handleExplore = () => {
-      onExplore(selection);
-      onClose();
-  }
-
-  if (!selection) return null;
-
-  return (
-    <div
-      ref={popoverRef}
-      style={{ top: position.top, left: position.left, transform: transform }}
-      className="absolute z-30 w-80 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl p-3 flex flex-col gap-2 animate-fade-in"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="text-sm text-gray-400 border-b border-gray-700 pb-2 mb-1">
-        <p className="font-semibold text-gray-200">Selected Text:</p>
-        <p className="italic line-clamp-2">"{selection}"</p>
-      </div>
-
-      <button
-        onClick={handleExplore}
-        className="w-full flex items-center justify-center gap-2 text-left p-2 rounded-md transition-colors duration-200 text-cyan-300 hover:bg-gray-700/50"
-      >
-        <SearchIcon className="w-4 h-4" />
-        <span className="font-semibold">Explore Topic</span>
-      </button>
-
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={context}
-          onChange={(e) => setContext(e.target.value)}
-          placeholder="Add context..."
-          className="flex-grow bg-gray-800 border border-gray-600 rounded-md text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 text-sm px-2 py-1"
-          onKeyDown={(e) => e.key === 'Enter' && handleExploreWithContext()}
-        />
-        <button
-          onClick={handleExploreWithContext}
-          disabled={!context.trim()}
-          className="p-1.5 rounded-md transition-colors bg-cyan-600 hover:bg-cyan-500 disabled:bg-gray-600 disabled:cursor-not-allowed flex-shrink-0"
-          aria-label="Explore with context"
-        >
-          <SearchIcon className="w-4 h-4 text-white" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-
-// --- The updated WikiArticle component ---
 interface WikiArticleProps {
   topic: string;
   content?: string;
@@ -93,65 +10,51 @@ interface WikiArticleProps {
 }
 
 export const WikiArticle: React.FC<WikiArticleProps> = ({ topic, content, onLinkClick }) => {
-  const [popover, setPopover] = useState<{ selection: string; position: { top: number; left: number }; transform: string; } | null>(null);
   const articleRef = useRef<HTMLElement>(null);
   
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [popoverContentText, setPopoverContentText] = useState('');
+  const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null);
+
   const handleMouseUp = () => {
-    // Timeout to allow click events to fire before selection is cleared
+    // Use a timeout to allow the browser to register the selection
     setTimeout(() => {
-        const selection = window.getSelection();
-        const selectedText = selection ? selection.toString().trim() : '';
+      const domSelection = window.getSelection();
+      const selectedText = domSelection ? domSelection.toString().trim() : '';
 
-        // Show popover only for reasonably long, non-link selections
-        if (selectedText.length > 3 && selectedText.length < 100) {
-            const target = selection?.anchorNode?.parentElement;
-            if (target?.tagName === 'A' || target?.tagName === 'BUTTON') {
-                setPopover(null);
-                return;
-            }
-
-            const range = selection!.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-            
-            if (articleRef.current) {
-                const articleRect = articleRef.current.getBoundingClientRect();
-                const popoverWidth = 320; // from w-80 class
-                const popoverHalfWidth = popoverWidth / 2;
-                const viewportPadding = 16;
-
-                const selectionCenterX = rect.left + rect.width / 2;
-                
-                let popoverLeft = selectionCenterX - articleRect.left;
-                let popoverTransform = 'translateX(-50%)';
-
-                // Check left viewport boundary
-                if ((selectionCenterX - popoverHalfWidth) < viewportPadding) {
-                    popoverLeft = viewportPadding;
-                    popoverTransform = 'translateX(0)';
-                }
-                
-                // Check right viewport boundary
-                if ((selectionCenterX + popoverHalfWidth) > (window.innerWidth - viewportPadding)) {
-                    popoverLeft = articleRect.width - viewportPadding;
-                    popoverTransform = 'translateX(-100%)';
-                }
-
-                setPopover({
-                    selection: selectedText,
-                    position: {
-                        top: rect.bottom - articleRect.top + 5,
-                        left: popoverLeft,
-                    },
-                    transform: popoverTransform,
-                });
-            }
-        } else {
-            setPopover(null);
+      if (selectedText.length > 2 && selectedText.length < 100 && domSelection) {
+        const target = domSelection.anchorNode?.parentElement;
+        // Prevent popover on non-article text
+        if (target?.closest('a, button, h1, h2, h3')) {
+          setPopoverOpen(false);
+          return;
         }
+
+        const range = domSelection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        
+        // Ensure the selection has a physical presence in the DOM
+        if (rect.width > 0 || rect.height > 0) {
+          setPopoverAnchorRect(rect);
+          setPopoverContentText(selectedText);
+          setPopoverOpen(true);
+        } else {
+          setPopoverOpen(false);
+        }
+      } else if (selectedText.length === 0) {
+         // Close popover if selection is cleared
+         setPopoverOpen(false);
+      }
     }, 10);
   };
   
-  // Basic markdown parser
+  const handleExplore = () => {
+    if (popoverContentText) {
+      onLinkClick(popoverContentText);
+      setPopoverOpen(false);
+    }
+  };
+
   const parsedContent = useMemo(() => {
     if (!content) return null;
 
@@ -170,22 +73,29 @@ export const WikiArticle: React.FC<WikiArticleProps> = ({ topic, content, onLink
     });
   }, [content]);
 
-
   return (
     <div className="relative bg-gray-800/50 p-6 sm:p-8 rounded-lg shadow-2xl w-full animate-fade-in border border-gray-700/50 flex flex-col">
       <h2 className="text-4xl font-bold mb-6 text-cyan-400 border-b-2 border-gray-700 pb-3 flex-shrink-0">{topic}</h2>
-      <article ref={articleRef} onMouseUp={handleMouseUp} onMouseDown={() => setPopover(null)} className="prose prose-invert max-w-none">
+      <article ref={articleRef} onMouseUp={handleMouseUp} className="prose prose-invert max-w-none">
         {content ? parsedContent : <SkeletonLoader />}
       </article>
-      {popover && popover.selection && (
-        <SelectionPopover 
-          selection={popover.selection}
-          position={popover.position}
-          transform={popover.transform}
-          onExplore={onLinkClick}
-          onClose={() => setPopover(null)}
-        />
-      )}
+
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen} virtualAnchor={popoverAnchorRect}>
+        <PopoverContent 
+            side="top" 
+            align="center"
+            sideOffset={8}
+            className="z-30 bg-gray-800 border border-gray-700 rounded-md shadow-2xl p-2 flex items-center gap-2 w-64"
+        >
+          <button
+            onClick={handleExplore}
+            className="flex items-center gap-2 text-left p-2 rounded-md transition-colors duration-200 text-cyan-300 hover:bg-gray-700/50 w-full"
+          >
+            <SearchIcon className="w-4 h-4 flex-shrink-0" />
+            <span className="font-semibold truncate">Explore: "{popoverContentText}"</span>
+          </button>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };
