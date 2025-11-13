@@ -1,14 +1,16 @@
-
 import React, { useMemo } from 'react';
+import { SkeletonLoader } from './SkeletonLoader';
 
 interface WikiArticleProps {
   topic: string;
-  content: string;
+  content?: string;
   onLinkClick: (topic: string) => void;
 }
 
 export const WikiArticle: React.FC<WikiArticleProps> = ({ topic, content, onLinkClick }) => {
   const parsedContent = useMemo(() => {
+    if (!content) return null;
+
     const paragraphs = content.split('\n').filter(p => p.trim() !== '');
     
     return paragraphs.map((paragraph, pIndex) => {
@@ -41,7 +43,7 @@ export const WikiArticle: React.FC<WikiArticleProps> = ({ topic, content, onLink
     <div className="bg-gray-800/50 p-6 sm:p-8 rounded-lg shadow-2xl w-full max-w-4xl animate-fade-in border border-gray-700/50">
       <h2 className="text-4xl font-bold mb-6 text-cyan-400 border-b-2 border-gray-700 pb-3">{topic}</h2>
       <article className="prose prose-invert max-w-none">
-        {parsedContent}
+        {content ? parsedContent : <SkeletonLoader />}
       </article>
     </div>
   );

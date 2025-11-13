@@ -1,18 +1,16 @@
-
 import React from 'react';
 import { SearchBar } from './SearchBar';
 import { LogoIcon } from './icons';
 
 interface WelcomeScreenProps {
   onSearch: (query: string) => void;
-  isLoading: boolean;
 }
 
 const suggestions = ["The Roman Empire", "Quantum Computing", "History of the Internet", "Photosynthesis"];
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSearch, isLoading }) => {
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSearch }) => {
   return (
-    <div className="text-center p-8 w-full max-w-3xl mx-auto flex flex-col items-center justify-center h-full animate-fade-in">
+    <div className="text-center p-8 w-full max-w-3xl mx-auto flex flex-col items-center animate-fade-in pt-20">
       <LogoIcon className="w-24 h-24 mx-auto text-cyan-500 mb-6" />
       <h2 className="text-5xl font-bold text-white mb-3 tracking-tight">
         Infinite Wiki
@@ -22,7 +20,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSearch, isLoadin
       </p>
       
       <div className="w-full max-w-xl mb-6">
-        <SearchBar onSearch={onSearch} isLoading={isLoading} isProminent={true} />
+        <SearchBar onSearch={onSearch} isProminent={true} />
       </div>
       
       <div className="flex flex-wrap justify-center items-center gap-3 text-sm">
@@ -31,8 +29,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSearch, isLoadin
           <button 
             key={s}
             onClick={() => onSearch(s)}
-            disabled={isLoading}
-            className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-full transition-colors duration-200 disabled:opacity-50"
+            className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-full transition-colors duration-200"
           >
             {s}
           </button>
