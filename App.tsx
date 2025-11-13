@@ -49,7 +49,6 @@ export default function App() {
   const [history, setHistory] = usePersistentState<string[]>('wiki-history', []);
   const [viewedTopics, setViewedTopics] = usePersistentState<string[]>('wiki-viewedTopics', []);
   const [articles, setArticles] = usePersistentState<ArticlesCache>('wiki-articles', {});
-  const [pageLinks, setPageLinks] = usePersistentState<{ [key: string]: string[] }>('wiki-pageLinks', {});
   const [deepDiveCache, setDeepDiveCache] = usePersistentState<{ [key: string]: DeepDiveContent }>('wiki-deepDive', {});
   const [error, setError] = useState<string | null>(null);
   
@@ -87,12 +86,6 @@ export default function App() {
     });
   };
 
-  const extractLinks = (content: string): string[] => {
-    const matches = content.match(/\[\[(.*?)\]\]/g) || [];
-    const uniqueLinks = new Set(matches.map(m => m.slice(2, -2)));
-    return Array.from(uniqueLinks);
-  };
-  
   const fetchArticleForView = useCallback(async (topic: string) => {
     addTopicToViewed(topic);
     if (articles[topic.toLowerCase()]) return;
@@ -100,14 +93,12 @@ export default function App() {
     try {
       const content = await generateWikiArticle(topic);
       setArticles(prev => ({ ...prev, [topic.toLowerCase()]: content }));
-      const links = extractLinks(content);
-      setPageLinks(prev => ({ ...prev, [topic.toLowerCase()]: links }));
     } catch (err) {
       console.error(err);
       setError(`Failed to generate article for "${topic}". Please try another topic.`);
       setHistory(prev => prev.filter(t => t.toLowerCase() !== topic.toLowerCase()));
     }
-  }, [articles, setArticles, setPageLinks, setHistory]);
+  }, [articles, setArticles, setHistory]);
 
   const startNewExploration = (topic: string) => {
     if (topic.trim() === '') return;
@@ -151,7 +142,6 @@ export default function App() {
     setViewedTopics([]);
     setError(null);
     setArticles({});
-    setPageLinks({});
     setDeepDiveCache({});
     setIsGraphView(false);
   };
@@ -187,7 +177,6 @@ export default function App() {
   };
   
   const currentArticleContent = currentTopic ? articles[currentTopic.toLowerCase()] : undefined;
-  const currentPageLinks = currentTopic ? pageLinks[currentTopic.toLowerCase()] || [] : [];
   const currentDeepDiveContent = currentTopic ? deepDiveCache[currentTopic.toLowerCase()] : undefined;
 
   return (
@@ -253,7 +242,6 @@ export default function App() {
                 {isGraphView && currentTopic && (
                     <KnowledgeGraph
                         viewedTopics={viewedTopics}
-                        pageLinks={pageLinks}
                         history={history}
                         onNodeClick={jumpToTopic}
                     />
@@ -266,10 +254,8 @@ export default function App() {
         {isExplorerVisible && (
             <aside className="w-64 md:w-72 flex-shrink-0 bg-gray-900/30 backdrop-blur-md border-l border-gray-700/50 overflow-y-auto">
                <ExplorerPanel 
-                    pageLinks={currentPageLinks}
                     viewedTopics={viewedTopics}
                     currentTopic={currentTopic}
-                    onExploreTopic={exploreTopic}
                     onJumpToTopic={jumpToTopic}
                 />
             </aside>

@@ -12,15 +12,9 @@ const imageModel = "gemini-2.5-flash-image";
 
 export const generateWikiArticle = async (topic: string): Promise<string> => {
   const prompt = `
-    You are an encyclopedist creating a page for an 'Infinite Wiki'. Your task is to write a clear, concise, and informative article about the topic: "${topic}".
+    You are an encyclopedist creating a page for an 'Infinite Wiki'. Your task is to write a clear, concise, and informative article using Markdown about the topic: "${topic}".
 
-    Follow these rules strictly:
-    1.  The article should be well-structured, easy to understand, and neutral in tone.
-    2.  Identify 7 to 10 key related concepts, terms, or entities within your explanation.
-    3.  Wrap each of these identified key terms *exactly* in double square brackets, like [[this]]. The terms inside the brackets must be in the same language as the topic "${topic}". For example, if writing in Spanish about "Sistema Solar", you might include terms like [[Sol]], [[Planeta]], and [[Júpiter]].
-    4.  Format the article into clear paragraphs, separated by a single newline character. Do not use any other markdown formatting (no headings, bold text, lists, etc.).
-    5.  Begin the article directly without any introductory phrases like "Here is an article about..." or "This article will discuss...".
-    6.  Ensure the response is only the article text itself.
+    The article should be well-structured, easy to understand, and neutral in tone. Format it into clear paragraphs and use standard Markdown for formatting like headings or lists where it improves clarity. Begin the article directly without any introductory phrases. Ensure the response is only the article text itself.
     `;
 
   try {

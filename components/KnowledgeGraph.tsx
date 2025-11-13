@@ -26,7 +26,6 @@ interface EdgeData {
 
 interface KnowledgeGraphProps {
   viewedTopics: string[];
-  pageLinks: { [key: string]: string[] }; // Now we use this
   history: string[];
   onNodeClick: (topic: string) => void;
 }
@@ -36,7 +35,7 @@ const colors = [
 ];
 
 // --- COMPONENT ---
-export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ viewedTopics, pageLinks, history, onNodeClick }) => {
+export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ viewedTopics, history, onNodeClick }) => {
   const [nodes, setNodes] = useState<Map<string, NodeData>>(new Map());
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   
@@ -44,44 +43,42 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ viewedTopics, pa
   
   const currentTopic = history.length > 0 ? history[history.length - 1] : null;
 
-  // Memoize edges based on pageLinks. This creates the "web" structure.
+  // Memoize edges based on navigation history.
   const edges = useMemo<EdgeData[]>(() => {
     const newEdges: EdgeData[] = [];
-    const viewedTopicsSet = new Set(viewedTopics.map(t => t.toLowerCase()));
-    
-    for (const sourceTopic in pageLinks) {
-      if (viewedTopicsSet.has(sourceTopic)) {
-        const links = pageLinks[sourceTopic];
-        links.forEach(targetTopic => {
-          if (viewedTopicsSet.has(targetTopic.toLowerCase())) {
-            newEdges.push({ source: sourceTopic, target: targetTopic.toLowerCase() });
-          }
-        });
-      }
+    if (history.length < 2) {
+      return [];
+    }
+    for (let i = 0; i < history.length - 1; i++) {
+      newEdges.push({
+        source: history[i].toLowerCase(),
+        target: history[i + 1].toLowerCase(),
+      });
     }
     return newEdges;
-  }, [pageLinks, viewedTopics]);
+  }, [history]);
   
-  // Memoize which nodes are connected to the hovered node
+  // Memoize which nodes are connected to the hovered node based on history
   const connectedNodeIds = useMemo(() => {
-    // FIX: Explicitly type the Set to avoid inferring Set<unknown>.
     if (!hoveredNodeId) return new Set<string>();
     const connected = new Set([hoveredNodeId.toLowerCase()]);
-    edges.forEach(edge => {
-      if (edge.source.toLowerCase() === hoveredNodeId.toLowerCase()) {
-        connected.add(edge.target.toLowerCase());
-      }
-      if (edge.target.toLowerCase() === hoveredNodeId.toLowerCase()) {
-        connected.add(edge.source.toLowerCase());
-      }
-    });
+    
+    const historyLower = history.map(h => h.toLowerCase());
+    const currentIndex = historyLower.indexOf(hoveredNodeId.toLowerCase());
+
+    if (currentIndex > 0) {
+      connected.add(historyLower[currentIndex - 1]);
+    }
+    if (currentIndex !== -1 && currentIndex < historyLower.length - 1) {
+      connected.add(historyLower[currentIndex + 1]);
+    }
+
     return connected;
-  }, [hoveredNodeId, edges]);
+  }, [hoveredNodeId, history]);
 
 
   // The Force-Directed Graph Simulation
   useEffect(() => {
-    // FIX: Use `let` to allow updating the simulation state between frames.
     let tempNodes: Map<string, NodeData> = new Map();
     
     // Initialize nodes with random positions
@@ -99,13 +96,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ viewedTopics, pa
     let iteration = 0;
 
     const runSimulation = () => {
-      // FIX: Remove check that incorrectly resets nodes at the end of the simulation.
       if (iteration >= SIMULATION_ITERATIONS) {
         return;
       }
       
-      // FIX: The simulation was not progressing because it always started from the initial `tempNodes`.
-      // By making `tempNodes` a `let` and updating it below, we ensure the simulation progresses.
       const newNodes = new Map(tempNodes);
 
       // Calculate forces for each node
@@ -155,7 +149,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ viewedTopics, pa
         node.y += node.vy;
       });
       
-      // FIX: Update tempNodes to carry the state to the next simulation frame.
       tempNodes = newNodes;
 
       iteration++;
@@ -196,7 +189,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ viewedTopics, pa
                 );
             })}
             {/* Nodes */}
-            {/* FIX: Explicitly type `node` as `NodeData` to resolve TypeScript errors where properties were not found on type `unknown`. */}
             {renderedNodes.map((node: NodeData) => {
                 const isCurrent = currentTopic?.toLowerCase() === node.id.toLowerCase();
                 const isHovered = hoveredNodeId === node.id;
