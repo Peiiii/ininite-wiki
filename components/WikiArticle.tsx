@@ -6,11 +6,12 @@ import { SearchIcon } from './icons';
 interface SelectionPopoverProps {
   selection: string;
   position: { top: number; left: number };
+  transform: string;
   onExplore: (topic: string) => void;
   onClose: () => void;
 }
 
-const SelectionPopover: React.FC<SelectionPopoverProps> = ({ selection, position, onExplore, onClose }) => {
+const SelectionPopover: React.FC<SelectionPopoverProps> = ({ selection, position, transform, onExplore, onClose }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [context, setContext] = useState('');
 
@@ -44,7 +45,7 @@ const SelectionPopover: React.FC<SelectionPopoverProps> = ({ selection, position
   return (
     <div
       ref={popoverRef}
-      style={{ top: position.top, left: position.left, transform: 'translateX(-50%)' }}
+      style={{ top: position.top, left: position.left, transform: transform }}
       className="absolute z-30 w-80 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl p-3 flex flex-col gap-2 animate-fade-in"
       onClick={(e) => e.stopPropagation()}
     >
@@ -92,7 +93,7 @@ interface WikiArticleProps {
 }
 
 export const WikiArticle: React.FC<WikiArticleProps> = ({ topic, content, onLinkClick }) => {
-  const [popover, setPopover] = useState<{ selection: string; position: { top: number; left: number } } | null>(null);
+  const [popover, setPopover] = useState<{ selection: string; position: { top: number; left: number }; transform: string; } | null>(null);
   const articleRef = useRef<HTMLElement>(null);
   
   const handleMouseUp = () => {
@@ -114,12 +115,34 @@ export const WikiArticle: React.FC<WikiArticleProps> = ({ topic, content, onLink
             
             if (articleRef.current) {
                 const articleRect = articleRef.current.getBoundingClientRect();
+                const popoverWidth = 320; // from w-80 class
+                const popoverHalfWidth = popoverWidth / 2;
+                const viewportPadding = 16;
+
+                const selectionCenterX = rect.left + rect.width / 2;
+                
+                let popoverLeft = selectionCenterX - articleRect.left;
+                let popoverTransform = 'translateX(-50%)';
+
+                // Check left viewport boundary
+                if ((selectionCenterX - popoverHalfWidth) < viewportPadding) {
+                    popoverLeft = viewportPadding;
+                    popoverTransform = 'translateX(0)';
+                }
+                
+                // Check right viewport boundary
+                if ((selectionCenterX + popoverHalfWidth) > (window.innerWidth - viewportPadding)) {
+                    popoverLeft = articleRect.width - viewportPadding;
+                    popoverTransform = 'translateX(-100%)';
+                }
+
                 setPopover({
                     selection: selectedText,
                     position: {
                         top: rect.bottom - articleRect.top + 5,
-                        left: rect.left - articleRect.left + (rect.width / 2),
-                    }
+                        left: popoverLeft,
+                    },
+                    transform: popoverTransform,
                 });
             }
         } else {
@@ -158,6 +181,7 @@ export const WikiArticle: React.FC<WikiArticleProps> = ({ topic, content, onLink
         <SelectionPopover 
           selection={popover.selection}
           position={popover.position}
+          transform={popover.transform}
           onExplore={onLinkClick}
           onClose={() => setPopover(null)}
         />

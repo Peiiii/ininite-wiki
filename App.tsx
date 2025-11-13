@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { generateWikiArticle, generateSimpleExplanation, generateAnalogy, generateQuiz, generateImageForTopic, QuizQuestion } from './services/geminiService';
+import { generateWikiArticle } from './services/geminiService';
 import { WikiArticle } from './components/WikiArticle';
 import { HistoryTrail } from './components/HistoryTrail';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -7,19 +7,11 @@ import { ErrorDisplay } from './components/ErrorDisplay';
 import { ExplorerPanel } from './components/ExplorerPanel';
 import { CommandKModal } from './components/CommandKModal';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
-import { DeepDivePanel } from './components/DeepDivePanel';
 import { GraphIcon, SearchIcon, BookOpenIcon, HomeIcon } from './components/icons';
 
 type ArticlesCache = {
   [key: string]: string;
 };
-
-interface DeepDiveContent {
-  simpleExplanation?: string;
-  analogy?: string;
-  quiz?: QuizQuestion[];
-  imageUrl?: string;
-}
 
 function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
@@ -49,17 +41,10 @@ export default function App() {
   const [history, setHistory] = usePersistentState<string[]>('wiki-history', []);
   const [viewedTopics, setViewedTopics] = usePersistentState<string[]>('wiki-viewedTopics', []);
   const [articles, setArticles] = usePersistentState<ArticlesCache>('wiki-articles', {});
-  const [deepDiveCache, setDeepDiveCache] = usePersistentState<{ [key: string]: DeepDiveContent }>('wiki-deepDive', {});
   const [error, setError] = useState<string | null>(null);
   
   const [isCommanderOpen, setIsCommanderOpen] = useState(false);
   const [isGraphView, setIsGraphView] = useState(false);
-  const [deepDiveLoading, setDeepDiveLoading] = useState({
-    simple: false,
-    analogy: false,
-    quiz: false,
-    image: false,
-  });
 
   const isExplorerVisible = viewedTopics.length > 0;
   
@@ -142,42 +127,10 @@ export default function App() {
     setViewedTopics([]);
     setError(null);
     setArticles({});
-    setDeepDiveCache({});
     setIsGraphView(false);
-  };
-
-  const handleDeepDive = async (type: 'simple' | 'analogy' | 'quiz' | 'image') => {
-    if (!currentTopic || !currentArticleContent) return;
-    
-    setDeepDiveLoading(prev => ({ ...prev, [type]: true }));
-    setError(null);
-    const topicKey = currentTopic.toLowerCase();
-
-    try {
-      let result;
-      if (type === 'simple') {
-        result = await generateSimpleExplanation(currentTopic, currentArticleContent);
-        setDeepDiveCache(prev => ({ ...prev, [topicKey]: { ...prev[topicKey], simpleExplanation: result } }));
-      } else if (type === 'analogy') {
-        result = await generateAnalogy(currentTopic, currentArticleContent);
-        setDeepDiveCache(prev => ({ ...prev, [topicKey]: { ...prev[topicKey], analogy: result } }));
-      } else if (type === 'quiz') {
-        result = await generateQuiz(currentTopic, currentArticleContent);
-        setDeepDiveCache(prev => ({ ...prev, [topicKey]: { ...prev[topicKey], quiz: result } }));
-      } else if (type === 'image') {
-        result = await generateImageForTopic(currentTopic);
-        setDeepDiveCache(prev => ({ ...prev, [topicKey]: { ...prev[topicKey], imageUrl: result } }));
-      }
-    } catch (err) {
-      console.error(`Error generating deep dive content for "${type}"`, err);
-      setError(`Failed to generate content for "${currentTopic}". The model may be unavailable.`);
-    } finally {
-      setDeepDiveLoading(prev => ({ ...prev, [type]: false }));
-    }
   };
   
   const currentArticleContent = currentTopic ? articles[currentTopic.toLowerCase()] : undefined;
-  const currentDeepDiveContent = currentTopic ? deepDiveCache[currentTopic.toLowerCase()] : undefined;
 
   return (
     <div className="h-screen bg-transparent font-sans text-gray-200 flex flex-col">
@@ -229,12 +182,6 @@ export default function App() {
                             topic={currentTopic}
                             content={currentArticleContent}
                             onLinkClick={exploreTopic}
-                        />
-                        <DeepDivePanel 
-                            topic={currentTopic}
-                            content={currentDeepDiveContent}
-                            loadingState={deepDiveLoading}
-                            onGenerate={handleDeepDive}
                         />
                     </div>
                 )}
