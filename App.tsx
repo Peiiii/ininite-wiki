@@ -7,7 +7,7 @@ import { ErrorDisplay } from './components/ErrorDisplay';
 import { ExplorerPanel } from './components/ExplorerPanel';
 import { CommandKModal } from './components/CommandKModal';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
-import { PanelLeftIcon, GraphIcon, LogoIcon, SearchIcon, BookOpenIcon } from './components/icons';
+import { PanelRightIcon, GraphIcon, LogoIcon, SearchIcon, BookOpenIcon } from './components/icons';
 
 type ArticlesCache = {
   [key: string]: string;
@@ -188,7 +188,7 @@ export default function App() {
         <div className="flex items-center space-x-3">
             {isExplorerVisible && !isDesktop && (
               <button onClick={() => setIsMobileExplorerOpen(true)} className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 transition-colors">
-                  <PanelLeftIcon className="h-5 w-5"/>
+                  <PanelRightIcon className="h-5 w-5"/>
               </button>
             )}
             <button onClick={() => setIsCommanderOpen(true)} className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 transition-colors">
@@ -210,36 +210,6 @@ export default function App() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {isExplorerVisible && isDesktop && (
-            <aside className="w-72 flex-shrink-0 bg-gray-900/30 backdrop-blur-md border-r border-gray-700/50 overflow-y-auto">
-               <ExplorerPanel 
-                    pageLinks={currentPageLinks}
-                    viewedTopics={viewedTopics}
-                    currentTopic={currentTopic}
-                    onExploreTopic={exploreTopic}
-                    onJumpToTopic={jumpToTopic}
-                />
-            </aside>
-        )}
-        
-        {isExplorerVisible && !isDesktop && isMobileExplorerOpen && (
-            <div className="fixed inset-0 bg-black/60 z-30 animate-fade-in" onClick={() => setIsMobileExplorerOpen(false)}>
-                <aside 
-                    className="absolute top-0 left-0 h-full w-80 bg-[#111827] border-r border-gray-700/50 shadow-2xl animate-slide-in-left" 
-                    onClick={e => e.stopPropagation()}
-                >
-                    <ExplorerPanel 
-                        pageLinks={currentPageLinks}
-                        viewedTopics={viewedTopics}
-                        currentTopic={currentTopic}
-                        onExploreTopic={exploreTopic}
-                        onJumpToTopic={jumpToTopic}
-                        onClose={() => setIsMobileExplorerOpen(false)}
-                    />
-                </aside>
-            </div>
-        )}
-
         <main className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col h-full overflow-y-auto">
             <div className="md:hidden mb-4">
                 {history.length > 0 && !isGraphView && <HistoryTrail history={history} onNavigate={navigateToHistory} />}
@@ -269,6 +239,36 @@ export default function App() {
                 {!currentTopic && !error && <WelcomeScreen onSearch={startNewExploration} />}
             </div>
         </main>
+
+        {isExplorerVisible && isDesktop && (
+            <aside className="w-72 flex-shrink-0 bg-gray-900/30 backdrop-blur-md border-l border-gray-700/50 overflow-y-auto">
+               <ExplorerPanel 
+                    pageLinks={currentPageLinks}
+                    viewedTopics={viewedTopics}
+                    currentTopic={currentTopic}
+                    onExploreTopic={exploreTopic}
+                    onJumpToTopic={jumpToTopic}
+                />
+            </aside>
+        )}
+        
+        {isExplorerVisible && !isDesktop && isMobileExplorerOpen && (
+            <div className="fixed inset-0 bg-black/60 z-30 animate-fade-in" onClick={() => setIsMobileExplorerOpen(false)}>
+                <aside 
+                    className="absolute top-0 right-0 h-full w-80 bg-[#111827] border-l border-gray-700/50 shadow-2xl animate-slide-in-right" 
+                    onClick={e => e.stopPropagation()}
+                >
+                    <ExplorerPanel 
+                        pageLinks={currentPageLinks}
+                        viewedTopics={viewedTopics}
+                        currentTopic={currentTopic}
+                        onExploreTopic={exploreTopic}
+                        onJumpToTopic={jumpToTopic}
+                        onClose={() => setIsMobileExplorerOpen(false)}
+                    />
+                </aside>
+            </div>
+        )}
       </div>
     </div>
   );
