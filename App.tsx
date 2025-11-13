@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { generateWikiArticle } from './services/geminiService';
+import { generateWikiArticle, generateSimpleExplanation, generateAnalogy, generateQuiz, generateImageForTopic, QuizQuestion } from './services/geminiService';
 import { WikiArticle } from './components/WikiArticle';
 import { HistoryTrail } from './components/HistoryTrail';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -7,11 +7,19 @@ import { ErrorDisplay } from './components/ErrorDisplay';
 import { ExplorerPanel } from './components/ExplorerPanel';
 import { CommandKModal } from './components/CommandKModal';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
-import { PanelRightIcon, GraphIcon, LogoIcon, SearchIcon, BookOpenIcon } from './components/icons';
+import { DeepDivePanel } from './components/DeepDivePanel';
+import { GraphIcon, SearchIcon, BookOpenIcon, HomeIcon } from './components/icons';
 
 type ArticlesCache = {
   [key: string]: string;
 };
+
+interface DeepDiveContent {
+  simpleExplanation?: string;
+  analogy?: string;
+  quiz?: QuizQuestion[];
+  imageUrl?: string;
+}
 
 function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [state, setState] = useState<T>(() => {
@@ -37,36 +45,25 @@ function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch
   return [state, setState];
 }
 
-function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(false);
-  useEffect(() => {
-      const media = window.matchMedia(query);
-      if (media.matches !== matches) {
-          setMatches(media.matches);
-      }
-      const listener = () => setMatches(media.matches);
-      // Use addEventListener for modern browser compatibility
-      media.addEventListener('change', listener);
-      return () => media.removeEventListener('change', listener);
-  }, [matches, query]);
-  return matches;
-}
-
 export default function App() {
   const [history, setHistory] = usePersistentState<string[]>('wiki-history', []);
   const [viewedTopics, setViewedTopics] = usePersistentState<string[]>('wiki-viewedTopics', []);
   const [articles, setArticles] = usePersistentState<ArticlesCache>('wiki-articles', {});
   const [pageLinks, setPageLinks] = usePersistentState<{ [key: string]: string[] }>('wiki-pageLinks', {});
+  const [deepDiveCache, setDeepDiveCache] = usePersistentState<{ [key: string]: DeepDiveContent }>('wiki-deepDive', {});
   const [error, setError] = useState<string | null>(null);
   
   const [isCommanderOpen, setIsCommanderOpen] = useState(false);
   const [isGraphView, setIsGraphView] = useState(false);
-  const [isMobileExplorerOpen, setIsMobileExplorerOpen] = useState(false);
+  const [deepDiveLoading, setDeepDiveLoading] = useState({
+    simple: false,
+    analogy: false,
+    quiz: false,
+    image: false,
+  });
 
-  const isDesktop = useMediaQuery('(min-width: 1024px)');
   const isExplorerVisible = viewedTopics.length > 0;
   
-  // Keyboard listener for Command-K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -116,7 +113,7 @@ export default function App() {
     if (topic.trim() === '') return;
     setError(null);
     setHistory([topic]);
-    setIsGraphView(false); // Always switch to article view for a new topic
+    setIsGraphView(false);
   };
   
   useEffect(() => {
@@ -127,7 +124,7 @@ export default function App() {
 
   const exploreTopic = (topic: string) => {
     setHistory(prev => [...prev, topic]);
-    setIsGraphView(false); // Switch to article view when exploring
+    setIsGraphView(false);
   };
   
   const navigateToHistory = (index: number) => {
@@ -138,7 +135,6 @@ export default function App() {
   const jumpToTopic = (topic: string) => {
     if (topic.toLowerCase() === currentTopic?.toLowerCase()) {
         setIsGraphView(false);
-        setIsMobileExplorerOpen(false);
         return;
     }
     
@@ -148,7 +144,6 @@ export default function App() {
     } else {
         exploreTopic(topic);
     }
-    setIsMobileExplorerOpen(false);
   };
 
   const goHome = () => {
@@ -157,12 +152,43 @@ export default function App() {
     setError(null);
     setArticles({});
     setPageLinks({});
+    setDeepDiveCache({});
     setIsGraphView(false);
-    setIsMobileExplorerOpen(false);
+  };
+
+  const handleDeepDive = async (type: 'simple' | 'analogy' | 'quiz' | 'image') => {
+    if (!currentTopic || !currentArticleContent) return;
+    
+    setDeepDiveLoading(prev => ({ ...prev, [type]: true }));
+    setError(null);
+    const topicKey = currentTopic.toLowerCase();
+
+    try {
+      let result;
+      if (type === 'simple') {
+        result = await generateSimpleExplanation(currentTopic, currentArticleContent);
+        setDeepDiveCache(prev => ({ ...prev, [topicKey]: { ...prev[topicKey], simpleExplanation: result } }));
+      } else if (type === 'analogy') {
+        result = await generateAnalogy(currentTopic, currentArticleContent);
+        setDeepDiveCache(prev => ({ ...prev, [topicKey]: { ...prev[topicKey], analogy: result } }));
+      } else if (type === 'quiz') {
+        result = await generateQuiz(currentTopic, currentArticleContent);
+        setDeepDiveCache(prev => ({ ...prev, [topicKey]: { ...prev[topicKey], quiz: result } }));
+      } else if (type === 'image') {
+        result = await generateImageForTopic(currentTopic);
+        setDeepDiveCache(prev => ({ ...prev, [topicKey]: { ...prev[topicKey], imageUrl: result } }));
+      }
+    } catch (err) {
+      console.error(`Error generating deep dive content for "${type}"`, err);
+      setError(`Failed to generate content for "${currentTopic}". The model may be unavailable.`);
+    } finally {
+      setDeepDiveLoading(prev => ({ ...prev, [type]: false }));
+    }
   };
   
   const currentArticleContent = currentTopic ? articles[currentTopic.toLowerCase()] : undefined;
   const currentPageLinks = currentTopic ? pageLinks[currentTopic.toLowerCase()] || [] : [];
+  const currentDeepDiveContent = currentTopic ? deepDiveCache[currentTopic.toLowerCase()] : undefined;
 
   return (
     <div className="h-screen bg-transparent font-sans text-gray-200 flex flex-col">
@@ -176,21 +202,15 @@ export default function App() {
 
       <header className="flex-shrink-0 h-16 bg-gray-900/50 backdrop-blur-md border-b border-gray-700/50 flex items-center justify-between px-4 sm:px-6 z-20">
         <div className="flex items-center space-x-4 flex-1 min-w-0">
-            <button onClick={goHome} className="flex items-center space-x-2 text-white hover:text-cyan-400 transition-colors flex-shrink-0">
-                <LogoIcon className="h-7 w-7" />
-                <span className="font-bold text-lg hidden sm:inline">Infinite Wiki</span>
+            <button onClick={goHome} className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 transition-colors flex-shrink-0" aria-label="Go Home">
+                <HomeIcon className="h-5 w-5" />
             </button>
-            <div className="flex-1 min-w-0 hidden md:block">
+            <div className="flex-1 min-w-0">
                 {history.length > 0 && <HistoryTrail history={history} onNavigate={navigateToHistory} />}
             </div>
         </div>
 
         <div className="flex items-center space-x-3">
-            {isExplorerVisible && !isDesktop && (
-              <button onClick={() => setIsMobileExplorerOpen(true)} className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 transition-colors">
-                  <PanelRightIcon className="h-5 w-5"/>
-              </button>
-            )}
             <button onClick={() => setIsCommanderOpen(true)} className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 transition-colors">
                 <SearchIcon className="h-5 w-5"/>
             </button>
@@ -211,37 +231,40 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col h-full overflow-y-auto">
-            <div className="md:hidden mb-4">
-                {history.length > 0 && !isGraphView && <HistoryTrail history={history} onNavigate={navigateToHistory} />}
-            </div>
-            <div className={`w-full h-full flex flex-col items-center ${!currentTopic ? 'justify-start pt-20' : 'justify-center'}`}>
+            <div className={`w-full h-full flex flex-col items-center ${!currentTopic ? 'justify-start pt-20' : ''}`}>
                 {error && <ErrorDisplay message={error} />}
             
                 {!error && currentTopic && !isGraphView && (
-                <div className="mx-auto w-full">
-                    <WikiArticle
-                    topic={currentTopic}
-                    content={currentArticleContent}
-                    onLinkClick={exploreTopic}
-                    />
-                </div>
+                    <div className="mx-auto w-full max-w-4xl flex flex-col gap-8">
+                        <WikiArticle
+                            topic={currentTopic}
+                            content={currentArticleContent}
+                            onLinkClick={exploreTopic}
+                        />
+                        <DeepDivePanel 
+                            topic={currentTopic}
+                            content={currentDeepDiveContent}
+                            loadingState={deepDiveLoading}
+                            onGenerate={handleDeepDive}
+                        />
+                    </div>
                 )}
 
-                {isGraphView && (
-                <KnowledgeGraph
-                    viewedTopics={viewedTopics}
-                    pageLinks={pageLinks}
-                    history={history}
-                    onNodeClick={jumpToTopic}
-                />
+                {isGraphView && currentTopic && (
+                    <KnowledgeGraph
+                        viewedTopics={viewedTopics}
+                        pageLinks={pageLinks}
+                        history={history}
+                        onNodeClick={jumpToTopic}
+                    />
                 )}
 
                 {!currentTopic && !error && <WelcomeScreen onSearch={startNewExploration} />}
             </div>
         </main>
 
-        {isExplorerVisible && isDesktop && (
-            <aside className="w-72 flex-shrink-0 bg-gray-900/30 backdrop-blur-md border-l border-gray-700/50 overflow-y-auto">
+        {isExplorerVisible && (
+            <aside className="w-64 md:w-72 flex-shrink-0 bg-gray-900/30 backdrop-blur-md border-l border-gray-700/50 overflow-y-auto">
                <ExplorerPanel 
                     pageLinks={currentPageLinks}
                     viewedTopics={viewedTopics}
@@ -250,24 +273,6 @@ export default function App() {
                     onJumpToTopic={jumpToTopic}
                 />
             </aside>
-        )}
-        
-        {isExplorerVisible && !isDesktop && isMobileExplorerOpen && (
-            <div className="fixed inset-0 bg-black/60 z-30 animate-fade-in" onClick={() => setIsMobileExplorerOpen(false)}>
-                <aside 
-                    className="absolute top-0 right-0 h-full w-80 bg-[#111827] border-l border-gray-700/50 shadow-2xl animate-slide-in-right" 
-                    onClick={e => e.stopPropagation()}
-                >
-                    <ExplorerPanel 
-                        pageLinks={currentPageLinks}
-                        viewedTopics={viewedTopics}
-                        currentTopic={currentTopic}
-                        onExploreTopic={exploreTopic}
-                        onJumpToTopic={jumpToTopic}
-                        onClose={() => setIsMobileExplorerOpen(false)}
-                    />
-                </aside>
-            </div>
         )}
       </div>
     </div>
