@@ -2,7 +2,7 @@ import React from 'react';
 import {
     CompassIcon,
     HistoryIcon,
-    QueueListIcon // Re-purposed icon for "On this page"
+    XIcon,
 } from './icons';
 
 interface ExplorerPanelProps {
@@ -11,17 +11,23 @@ interface ExplorerPanelProps {
     currentTopic: string | null;
     onExploreTopic: (topic: string) => void;
     onJumpToTopic: (topic: string) => void;
+    onClose?: () => void;
 }
 
 export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({
-    pageLinks, viewedTopics, currentTopic, onExploreTopic, onJumpToTopic
+    pageLinks, viewedTopics, currentTopic, onExploreTopic, onJumpToTopic, onClose
 }) => {
     const reversedViewedTopics = [...viewedTopics].reverse();
 
     return (
-        <aside className="bg-transparent flex flex-col h-full overflow-y-auto w-full">
-            <div className="p-4 border-b border-gray-700/50 flex-shrink-0">
+        <div className="bg-transparent flex flex-col h-full overflow-y-auto w-full">
+            <div className="p-4 border-b border-gray-700/50 flex-shrink-0 flex items-center justify-between">
                 <h2 className="text-xl font-bold text-white">Explorer</h2>
+                {onClose && (
+                    <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-700/50 hover:text-white">
+                        <XIcon className="w-5 h-5"/>
+                    </button>
+                )}
             </div>
             <div className="flex-grow overflow-y-auto">
                 <section className="p-4">
@@ -72,6 +78,6 @@ export const ExplorerPanel: React.FC<ExplorerPanelProps> = ({
                     </div>
                 </section>
             </div>
-        </aside>
+        </div>
     );
 };

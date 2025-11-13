@@ -19,7 +19,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onSearch }) => {
   };
 
   return (
-    <div className="text-center p-8 w-full max-w-3xl mx-auto flex flex-col items-center animate-fade-in pt-20">
+    <div className="text-center p-8 w-full max-w-3xl mx-auto flex flex-col items-center animate-fade-in">
       <LogoIcon className="w-24 h-24 mx-auto text-cyan-500 mb-6" />
       <h2 className="text-5xl font-bold text-white mb-3 tracking-tight">
         Infinite Wiki

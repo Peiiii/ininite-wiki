@@ -15,7 +15,7 @@ const ChevronRightIcon: React.FC<{ className?: string }> = ({ className }) => (
 
 export const HistoryTrail: React.FC<HistoryTrailProps> = ({ history, onNavigate }) => {
   return (
-    <nav className="flex items-center text-sm text-gray-400 mb-4 overflow-x-auto pb-2">
+    <nav className="flex items-center text-sm text-gray-400 overflow-x-auto pb-2">
       {history.map((item, index) => (
         <React.Fragment key={index}>
           <button

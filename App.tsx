@@ -7,33 +7,64 @@ import { ErrorDisplay } from './components/ErrorDisplay';
 import { ExplorerPanel } from './components/ExplorerPanel';
 import { CommandKModal } from './components/CommandKModal';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
-import { PanelLeftIcon, PanelRightIcon, HomeIcon, GraphIcon } from './components/icons';
+import { PanelLeftIcon, GraphIcon, LogoIcon, SearchIcon, BookOpenIcon } from './components/icons';
 
 type ArticlesCache = {
   [key: string]: string;
 };
 
+function usePersistentState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [state, setState] = useState<T>(() => {
+    try {
+      const storedValue = window.localStorage.getItem(key);
+      if (storedValue) {
+        return JSON.parse(storedValue);
+      }
+    } catch (error) {
+      console.error(`Error reading localStorage key “${key}”:`, error);
+    }
+    return defaultValue;
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(state));
+    } catch (error) {
+      console.error(`Error setting localStorage key “${key}”:`, error);
+    }
+  }, [key, state]);
+
+  return [state, setState];
+}
+
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+  useEffect(() => {
+      const media = window.matchMedia(query);
+      if (media.matches !== matches) {
+          setMatches(media.matches);
+      }
+      const listener = () => setMatches(media.matches);
+      // Use addEventListener for modern browser compatibility
+      media.addEventListener('change', listener);
+      return () => media.removeEventListener('change', listener);
+  }, [matches, query]);
+  return matches;
+}
+
 export default function App() {
-  const [history, setHistory] = useState<string[]>([]);
-  const [viewedTopics, setViewedTopics] = useState<string[]>([]);
-  const [articles, setArticles] = useState<ArticlesCache>({});
-  const [pageLinks, setPageLinks] = useState<{ [key: string]: string[] }>({});
+  const [history, setHistory] = usePersistentState<string[]>('wiki-history', []);
+  const [viewedTopics, setViewedTopics] = usePersistentState<string[]>('wiki-viewedTopics', []);
+  const [articles, setArticles] = usePersistentState<ArticlesCache>('wiki-articles', {});
+  const [pageLinks, setPageLinks] = usePersistentState<{ [key: string]: string[] }>('wiki-pageLinks', {});
   const [error, setError] = useState<string | null>(null);
   
-  const [isExplorerOpen, setIsExplorerOpen] = useState(false);
-  const [hasExplorerBeenPopulated, setHasExplorerBeenPopulated] = useState(false);
   const [isCommanderOpen, setIsCommanderOpen] = useState(false);
   const [isGraphView, setIsGraphView] = useState(false);
+  const [isMobileExplorerOpen, setIsMobileExplorerOpen] = useState(false);
 
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
   const isExplorerVisible = viewedTopics.length > 0;
-
-  // Auto-open explorer on first population
-  useEffect(() => {
-    if (isExplorerVisible && !hasExplorerBeenPopulated) {
-      setIsExplorerOpen(true);
-      setHasExplorerBeenPopulated(true);
-    }
-  }, [isExplorerVisible, hasExplorerBeenPopulated]);
   
   // Keyboard listener for Command-K
   useEffect(() => {
@@ -79,7 +110,7 @@ export default function App() {
       setError(`Failed to generate article for "${topic}". Please try another topic.`);
       setHistory(prev => prev.filter(t => t.toLowerCase() !== topic.toLowerCase()));
     }
-  }, [articles]);
+  }, [articles, setArticles, setPageLinks, setHistory]);
 
   const startNewExploration = (topic: string) => {
     if (topic.trim() === '') return;
@@ -105,8 +136,19 @@ export default function App() {
   };
   
   const jumpToTopic = (topic: string) => {
-    if (topic.toLowerCase() === currentTopic?.toLowerCase()) return;
-    startNewExploration(topic);
+    if (topic.toLowerCase() === currentTopic?.toLowerCase()) {
+        setIsGraphView(false);
+        setIsMobileExplorerOpen(false);
+        return;
+    }
+    
+    const existingTopicIndex = history.findIndex(t => t.toLowerCase() === topic.toLowerCase());
+    if (existingTopicIndex > -1) {
+        navigateToHistory(existingTopicIndex);
+    } else {
+        exploreTopic(topic);
+    }
+    setIsMobileExplorerOpen(false);
   };
 
   const goHome = () => {
@@ -115,16 +157,15 @@ export default function App() {
     setError(null);
     setArticles({});
     setPageLinks({});
-    setHasExplorerBeenPopulated(false);
-    setIsExplorerOpen(false);
     setIsGraphView(false);
+    setIsMobileExplorerOpen(false);
   };
   
   const currentArticleContent = currentTopic ? articles[currentTopic.toLowerCase()] : undefined;
   const currentPageLinks = currentTopic ? pageLinks[currentTopic.toLowerCase()] || [] : [];
 
   return (
-    <div className="h-screen bg-transparent font-sans text-gray-200 flex flex-col relative">
+    <div className="h-screen bg-transparent font-sans text-gray-200 flex flex-col">
       <CommandKModal 
         isOpen={isCommanderOpen}
         onClose={() => setIsCommanderOpen(false)}
@@ -133,71 +174,101 @@ export default function App() {
         onJump={jumpToTopic}
       />
 
-      {/* Floating Action Buttons */}
-      <div className="absolute top-4 left-4 z-30">
-        <button onClick={goHome} className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 backdrop-blur-md transition-colors">
-          <HomeIcon className="h-6 w-6"/>
-        </button>
-      </div>
+      <header className="flex-shrink-0 h-16 bg-gray-900/50 backdrop-blur-md border-b border-gray-700/50 flex items-center justify-between px-4 sm:px-6 z-20">
+        <div className="flex items-center space-x-4 flex-1 min-w-0">
+            <button onClick={goHome} className="flex items-center space-x-2 text-white hover:text-cyan-400 transition-colors flex-shrink-0">
+                <LogoIcon className="h-7 w-7" />
+                <span className="font-bold text-lg hidden sm:inline">Infinite Wiki</span>
+            </button>
+            <div className="flex-1 min-w-0 hidden md:block">
+                {history.length > 0 && <HistoryTrail history={history} onNavigate={navigateToHistory} />}
+            </div>
+        </div>
 
-      <div className="absolute top-4 right-4 z-30 flex items-center space-x-2">
-        {isExplorerVisible && (
-          <button onClick={() => setIsGraphView(!isGraphView)} className={`p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 backdrop-blur-md transition-colors ${isGraphView ? 'text-cyan-400' : ''}`}>
-            <GraphIcon className="h-6 w-6"/>
-          </button>
-        )}
-        {isExplorerVisible && (
-           <button onClick={() => setIsExplorerOpen(!isExplorerOpen)} className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 backdrop-blur-md transition-colors">
-            {isExplorerOpen ? <PanelRightIcon className="h-6 w-6"/> : <PanelLeftIcon className="h-6 w-6"/>}
-           </button>
-        )}
-      </div>
+        <div className="flex items-center space-x-3">
+            {isExplorerVisible && !isDesktop && (
+              <button onClick={() => setIsMobileExplorerOpen(true)} className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 transition-colors">
+                  <PanelLeftIcon className="h-5 w-5"/>
+              </button>
+            )}
+            <button onClick={() => setIsCommanderOpen(true)} className="p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/70 transition-colors">
+                <SearchIcon className="h-5 w-5"/>
+            </button>
+            {isExplorerVisible && (
+                <div className="flex items-center bg-gray-800/60 border border-gray-700 rounded-md p-0.5">
+                    <button onClick={() => setIsGraphView(false)} className={`px-2 py-1 rounded-sm text-sm flex items-center space-x-1.5 transition-colors ${!isGraphView ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'}`}>
+                        <BookOpenIcon className="h-4 w-4"/>
+                        <span className="hidden md:inline">Article</span>
+                    </button>
+                    <button onClick={() => setIsGraphView(true)} className={`px-2 py-1 rounded-sm text-sm flex items-center space-x-1.5 transition-colors ${isGraphView ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-700/50 hover:text-gray-200'}`}>
+                        <GraphIcon className="h-4 w-4"/>
+                        <span className="hidden md:inline">Graph</span>
+                    </button>
+                </div>
+            )}
+        </div>
+      </header>
 
-      <div className="flex flex-1 overflow-hidden pt-16">
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col h-full overflow-y-auto">
-          {history.length > 0 && !isGraphView && (
-            <HistoryTrail history={history} onNavigate={navigateToHistory} />
-          )}
-          
-          <div className={`${history.length > 0 ? 'mt-8' : ''}`}>
-            {error && <ErrorDisplay message={error} />}
-            
-            {!error && currentTopic && !isGraphView && (
-              <div className="mx-auto w-full">
-                <WikiArticle
-                  topic={currentTopic}
-                  content={currentArticleContent}
-                  onLinkClick={exploreTopic}
+      <div className="flex flex-1 overflow-hidden">
+        {isExplorerVisible && isDesktop && (
+            <aside className="w-72 flex-shrink-0 bg-gray-900/30 backdrop-blur-md border-r border-gray-700/50 overflow-y-auto">
+               <ExplorerPanel 
+                    pageLinks={currentPageLinks}
+                    viewedTopics={viewedTopics}
+                    currentTopic={currentTopic}
+                    onExploreTopic={exploreTopic}
+                    onJumpToTopic={jumpToTopic}
                 />
-              </div>
-            )}
-
-            {isGraphView && (
-              <KnowledgeGraph
-                viewedTopics={viewedTopics}
-                history={history}
-                onNodeClick={jumpToTopic}
-              />
-            )}
-
-            {!currentTopic && !error && <WelcomeScreen onSearch={startNewExploration} />}
-          </div>
-        </main>
-
-        {isExplorerVisible && (
-            <aside className={`
-            flex-shrink-0 transition-all duration-300 ease-in-out bg-[#111827]/60 backdrop-blur-md border-l border-gray-700/50
-            ${isExplorerOpen ? 'w-80' : 'w-0'}
-            `}>
-            <ExplorerPanel 
-                pageLinks={currentPageLinks}
-                viewedTopics={viewedTopics}
-                currentTopic={currentTopic}
-                onExploreTopic={exploreTopic}
-                onJumpToTopic={jumpToTopic}
-            />
             </aside>
         )}
+        
+        {isExplorerVisible && !isDesktop && isMobileExplorerOpen && (
+            <div className="fixed inset-0 bg-black/60 z-30 animate-fade-in" onClick={() => setIsMobileExplorerOpen(false)}>
+                <aside 
+                    className="absolute top-0 left-0 h-full w-80 bg-[#111827] border-r border-gray-700/50 shadow-2xl animate-slide-in-left" 
+                    onClick={e => e.stopPropagation()}
+                >
+                    <ExplorerPanel 
+                        pageLinks={currentPageLinks}
+                        viewedTopics={viewedTopics}
+                        currentTopic={currentTopic}
+                        onExploreTopic={exploreTopic}
+                        onJumpToTopic={jumpToTopic}
+                        onClose={() => setIsMobileExplorerOpen(false)}
+                    />
+                </aside>
+            </div>
+        )}
+
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col h-full overflow-y-auto">
+            <div className="md:hidden mb-4">
+                {history.length > 0 && !isGraphView && <HistoryTrail history={history} onNavigate={navigateToHistory} />}
+            </div>
+            <div className={`w-full h-full flex flex-col items-center ${!currentTopic ? 'justify-start pt-20' : 'justify-center'}`}>
+                {error && <ErrorDisplay message={error} />}
+            
+                {!error && currentTopic && !isGraphView && (
+                <div className="mx-auto w-full">
+                    <WikiArticle
+                    topic={currentTopic}
+                    content={currentArticleContent}
+                    onLinkClick={exploreTopic}
+                    />
+                </div>
+                )}
+
+                {isGraphView && (
+                <KnowledgeGraph
+                    viewedTopics={viewedTopics}
+                    pageLinks={pageLinks}
+                    history={history}
+                    onNodeClick={jumpToTopic}
+                />
+                )}
+
+                {!currentTopic && !error && <WelcomeScreen onSearch={startNewExploration} />}
+            </div>
+        </main>
       </div>
     </div>
   );
