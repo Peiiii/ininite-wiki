@@ -7,12 +7,14 @@ if (!API_KEY) {
 }
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
-const textModel = "gemini-2.5-flash";
+const textModel = "gemini-flash-lite-latest";
 const imageModel = "gemini-2.5-flash-image";
 
 export const generateWikiArticle = async (topic: string): Promise<string> => {
   const prompt = `
     You are an encyclopedist creating a page for an 'Infinite Wiki'. Your task is to write a clear, concise, and informative article using Markdown about the topic: "${topic}".
+
+    The article must be written in the same language as the topic.
 
     The article should be well-structured, easy to understand, and neutral in tone. Format it into clear paragraphs and use standard Markdown for formatting like headings or lists where it improves clarity. Begin the article directly without any introductory phrases. Ensure the response is only the article text itself.
     `;
@@ -31,7 +33,7 @@ export const generateWikiArticle = async (topic: string): Promise<string> => {
 
 
 export const generateSimpleExplanation = async (topic: string, articleContent: string): Promise<string> => {
-    const prompt = `Based on the following article about "${topic}", explain it in simple terms, as if you were talking to a curious 10-year-old. Focus on the main ideas and avoid jargon.\n\nArticle:\n${articleContent}`;
+    const prompt = `Based on the following article about "${topic}", explain it in simple terms, as if you were talking to a curious 10-year-old. Your explanation must be in the same language as the provided article. Focus on the main ideas and avoid jargon.\n\nArticle:\n${articleContent}`;
     try {
         const response = await ai.models.generateContent({ model: textModel, contents: prompt });
         return response.text;
@@ -42,7 +44,7 @@ export const generateSimpleExplanation = async (topic: string, articleContent: s
 };
 
 export const generateAnalogy = async (topic: string, articleContent: string): Promise<string> => {
-    const prompt = `Based on the following article about "${topic}", create a compelling and easy-to-understand analogy to explain the core concept. Introduce the analogy and then briefly explain how it connects to the topic.\n\nArticle:\n${articleContent}`;
+    const prompt = `Based on the following article about "${topic}", create a compelling and easy-to-understand analogy to explain the core concept. The analogy must be in the same language as the provided article. Introduce the analogy and then briefly explain how it connects to the topic.\n\nArticle:\n${articleContent}`;
     try {
         const response = await ai.models.generateContent({ model: textModel, contents: prompt });
         return response.text;
@@ -82,7 +84,7 @@ const quizSchema = {
 };
 
 export const generateQuiz = async (topic: string, articleContent: string): Promise<QuizQuestion[]> => {
-    const prompt = `Based on the following article about "${topic}", create a 3-question multiple-choice quiz to test understanding of the key concepts. Each question must have exactly 4 options. The 'answer' field must exactly match one of the strings in the 'options' array.\n\nArticle:\n${articleContent}`;
+    const prompt = `Based on the following article about "${topic}", create a 3-question multiple-choice quiz to test understanding of the key concepts. The quiz (questions, options, and answers) must be in the same language as the provided article. Each question must have exactly 4 options. The 'answer' field must exactly match one of the strings in the 'options' array.\n\nArticle:\n${articleContent}`;
     try {
         const response = await ai.models.generateContent({
             model: textModel,

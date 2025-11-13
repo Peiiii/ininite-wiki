@@ -220,7 +220,7 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col h-full overflow-y-auto">
-            <div className={`w-full h-full flex flex-col items-center ${!currentTopic ? 'justify-start pt-20' : ''}`}>
+            <div className={`w-full ${!currentTopic ? 'h-full' : ''} flex flex-col items-center ${!currentTopic ? 'justify-start pt-20' : ''}`}>
                 {error && <ErrorDisplay message={error} />}
             
                 {!error && currentTopic && !isGraphView && (

@@ -149,9 +149,9 @@ export const WikiArticle: React.FC<WikiArticleProps> = ({ topic, content, onLink
 
 
   return (
-    <div className="relative bg-gray-800/50 p-6 sm:p-8 rounded-lg shadow-2xl w-full animate-fade-in border border-gray-700/50 flex flex-col max-h-[60vh]">
+    <div className="relative bg-gray-800/50 p-6 sm:p-8 rounded-lg shadow-2xl w-full animate-fade-in border border-gray-700/50 flex flex-col">
       <h2 className="text-4xl font-bold mb-6 text-cyan-400 border-b-2 border-gray-700 pb-3 flex-shrink-0">{topic}</h2>
-      <article ref={articleRef} onMouseUp={handleMouseUp} onMouseDown={() => setPopover(null)} className="prose prose-invert max-w-none overflow-y-auto pr-2 custom-scroll">
+      <article ref={articleRef} onMouseUp={handleMouseUp} onMouseDown={() => setPopover(null)} className="prose prose-invert max-w-none">
         {content ? parsedContent : <SkeletonLoader />}
       </article>
       {popover && popover.selection && (
