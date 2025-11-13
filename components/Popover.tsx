@@ -118,13 +118,20 @@ export const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentPro
         return { top, left };
       }
       
-      // Fix: Explicitly type `finalSide` as `Side` to prevent type widening.
-      let finalSide: Side = side;
+      // Fix: Corrected logic for handling collisions with the viewport.
+      // The original implementation had a bug where a flipped side (e.g., top -> bottom)
+      // could be immediately re-evaluated by the next `if` condition. Using `else if`
+      // ensures the side is only flipped once if necessary.
+      // Fix: Corrected type error by casting side to Side.
+let finalSide: Side = side as Side;
       let pos = getPosition(finalSide);
       
       // Vertical collision detection
-      if (finalSide === 'top' && pos.top < VIEWPORT_PADDING) finalSide = 'bottom';
-      if (finalSide === 'bottom' && pos.top + contentRect.height > window.innerHeight - VIEWPORT_PADDING) finalSide = 'top';
+      if (finalSide === 'top' && pos.top < VIEWPORT_PADDING) {
+        finalSide = 'bottom';
+      } else if (finalSide === 'bottom' && pos.top + contentRect.height > window.innerHeight - VIEWPORT_PADDING) {
+        finalSide = 'top';
+      }
 
       pos = getPosition(finalSide); // Recalculate with new side if needed
 
@@ -145,13 +152,22 @@ export const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentPro
       const arrowLeft = anchorRect.left + anchorRect.width / 2 - pos.left - ARROW_SIZE;
       const clampedArrowLeft = Math.max(ARROW_SIZE, Math.min(arrowLeft, contentRect.width - ARROW_SIZE * 2));
 
-      if (finalSide === 'top') {
-        setArrowStyle({ bottom: `-${ARROW_SIZE}px`, left: `${clampedArrowLeft}px`, borderTopColor: '#1f2937' });
-      } else if (finalSide === 'bottom') {
-        setArrowStyle({ top: `-${ARROW_SIZE}px`, left: `${clampedArrowLeft}px`, borderBottomColor: '#1f2937' });
-      } else {
-        setArrowStyle({});
+      // Fix: Consolidate arrow styling to prevent overrides and ensure visibility.
+      const newArrowStyle: React.CSSProperties = {
+        left: `${clampedArrowLeft}px`,
+      };
+
+      if (finalSide === 'top') { // Popover is above, arrow points down
+        newArrowStyle.bottom = `-${ARROW_SIZE}px`;
+        newArrowStyle.borderTopColor = '#1f2937';
+        newArrowStyle.borderBottomWidth = 0;
+      } else if (finalSide === 'bottom') { // Popover is below, arrow points up
+        newArrowStyle.top = `-${ARROW_SIZE}px`;
+        newArrowStyle.borderBottomColor = '#1f2937';
+        newArrowStyle.borderTopWidth = 0;
       }
+      
+      setArrowStyle(newArrowStyle);
 
     }, [isOpen, anchorEl, virtualAnchor, side, align, sideOffset, alignOffset]);
 
@@ -199,7 +215,13 @@ export const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentPro
         {children}
         <div 
           className="absolute w-0 h-0 border-x-8 border-x-transparent"
-          style={{ ...arrowStyle, borderWidth: `${ARROW_SIZE}px`, borderColor: 'transparent' }}
+          style={{
+            borderTopWidth: `${ARROW_SIZE}px`,
+            borderBottomWidth: `${ARROW_SIZE}px`,
+            borderTopColor: 'transparent',
+            borderBottomColor: 'transparent',
+            ...arrowStyle
+          }}
         />
       </div>
     );
